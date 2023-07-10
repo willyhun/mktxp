@@ -15,8 +15,8 @@ class W60GCollector(BaseCollector):
         if not router_entry.config_entry.w60g:
             return
 
-        monitor_labels = ['frequency', 'noise_floor', 'overall_tx_ccq', 'registered_clients', 'registered_peers']
-        monitor_records = InterfaceMonitorMetricsDataSource.metric_records(router_entry, metric_labels = monitor_labels, kind = WirelessMetricsDataSource.wireless_package(router_entry))   
+        monitor_labels = ['frequency', 'connected', 'distance', 'mac_address', 'name', 'comment', 'remote-address', 'rssi', 'signal', 'tx-mcs', 'tx-packet-error-rate', 'tx-phy-rate', 'tx-sector']
+        monitor_records = InterfaceMonitorMetricsDataSource.metric_records(router_entry, metric_labels = monitor_labels, kind = W60GMetricsDataSource.interface_type(router_entry))   
         if monitor_records:
             # sanitize records for relevant labels
             noise_floor_records = [monitor_record for monitor_record in monitor_records if monitor_record.get('noise_floor')]
@@ -35,20 +35,6 @@ class W60GCollector(BaseCollector):
                 registered_clients_metrics = BaseCollector.gauge_collector('wlan_registered_clients', 'Number of registered clients', registered_clients_records, 'registered_clients', ['channel'])
                 yield registered_clients_metrics
 
-        # the client info metrics
-        if router_entry.config_entry.wireless_clients:
-            registration_labels = ['interface', 'ssid', 'mac_address', 'tx_rate', 'rx_rate', 'uptime', 'bytes', 'signal_to_noise', 'tx_ccq', 'signal_strength', 'signal']
-            registration_records = WirelessMetricsDataSource.metric_records(router_entry, metric_labels = registration_labels)
-            if registration_records:
-                for registration_record in registration_records:
-                    BaseOutputProcessor.augment_record(router_entry, registration_record)
-
-                tx_byte_metrics = BaseCollector.counter_collector('wlan_clients_tx_bytes', 'Number of sent packet bytes', registration_records, 'tx_bytes', ['dhcp_name'])
-                yield tx_byte_metrics
-
-                rx_byte_metrics = BaseCollector.counter_collector('wlan_clients_rx_bytes', 'Number of received packet bytes', registration_records, 'rx_bytes', ['dhcp_name'])
-                yield rx_byte_metrics
-
                 signal_strength_metrics = BaseCollector.gauge_collector('wlan_clients_signal_strength', 'Average strength of the client signal recevied by AP', registration_records, 'signal_strength', ['dhcp_name'])
                 yield signal_strength_metrics
 
@@ -58,8 +44,22 @@ class W60GCollector(BaseCollector):
                 tx_ccq_metrics = BaseCollector.gauge_collector('wlan_clients_tx_ccq', 'Client Connection Quality (CCQ) for transmit', registration_records, 'tx_ccq', ['dhcp_name'])
                 yield tx_ccq_metrics
 
-                registration_metrics = BaseCollector.info_collector('wlan_clients_devices', 'Client devices info', 
-                                        registration_records, ['dhcp_name', 'dhcp_address', 'rx_signal', 'ssid', 'tx_rate', 'rx_rate', 'interface', 'mac_address', 'uptime'])
+        # the client info metrics
+        if router_entry.config_entry.w60g_peers:
+            interface_labels = 'frequency', 'running', 'ssid', 'mac-address', 'name', 'mode', 'rx-mpdu-crc-err',  'rx-mpdu-crc-ok', 'rx-ppdu', 'tx-fw-msdu', 'tx-io-msdu', 'tx-mpdu-new', 'tx-mpdu-retry', 'tx-mpdu-total', 'tx-ppdu','tx-ppdu-from-q', 'tx-sw-msdu', 'tx-sector']
+            interface_records = W60GMetricsDataSource.metric_records(router_entry, metric_labels = interface_labels)
+            if interface_records:
+                for interface_record in interface_records:
+                    BaseOutputProcessor.augment_record(router_entry, interface_record)
+
+                tx_ppdu_metrics = BaseCollector.counter_collector('tx-ppdu', 'Number of sent data unites', interface_records, 'tx_ppdu', ['name'])
+                yield tx_ppdu_metrics
+
+                rx_ppdu_metrics = BaseCollector.counter_collector('rx-ppdu', 'Number of received data units', interface_records, 'rx_ppdu', ['name'])
+                yield rx_ppdu_metrics
+
+                interface_metrics = BaseCollector.info_collector('w60g_imterface_metrics', 'Running Interface Metric', 
+                                        interface_records, ['name', 'mac-address', 'ssid', 'tx-ppdu', 'rx-ppdu', 'running'])
                 yield registration_metrics
 
 
